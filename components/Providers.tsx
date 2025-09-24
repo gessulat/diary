@@ -4,6 +4,7 @@ import { evolu } from "../lib/Db";
 import { IntlProvider } from "../lib/contexts/IntlContext";
 import { NowProvider } from "../lib/contexts/NowContext";
 import { UiStateProvider } from "../lib/contexts/UiStateContext";
+import { TranscriptionProvider } from "./TranscriptionProvider";
 
 // For quick timezone dev test:
 // const now = Date.now;
@@ -14,7 +15,9 @@ export const Providers: FC<{ children: ReactNode }> = ({ children }) => {
     <EvoluProvider value={evolu}>
       <NowProvider>
         <IntlProvider>
-          <UiStateProvider>{children}</UiStateProvider>
+          <TranscriptionProvider>
+            <UiStateProvider>{children}</UiStateProvider>
+          </TranscriptionProvider>
         </IntlProvider>
       </NowProvider>
     </EvoluProvider>

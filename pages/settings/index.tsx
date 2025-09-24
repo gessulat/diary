@@ -4,14 +4,18 @@ import {
   useEvolu,
   useOwner,
 } from "@evolu/react";
-import { create } from "@stylexjs/stylex";
+import { create, props } from "@stylexjs/stylex";
 import { Effect, Exit } from "effect";
-import { useState } from "react";
+import type { ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { PageWithTitle } from "../../components/PageWithTitle";
 import { Text } from "../../components/Text";
+import { TextInput } from "../../components/TextInput";
+import { useTranscription } from "../../components/TranscriptionProvider";
 import { prompt } from "../../lib/Prompt";
-import { fonts } from "../../lib/Tokens.stylex";
+import { colors, fonts } from "../../lib/Tokens.stylex";
+import { ConnectionState } from "../../lib/stt/types";
 
 export default function Settings() {
   const owner = useOwner();
@@ -67,6 +71,7 @@ export default function Settings() {
         title="Reset Owner"
         onPress={handleResetOwnerPress}
       />
+      <OpenAiKeySection />
     </PageWithTitle>
   );
 }
@@ -78,3 +83,247 @@ const styles = create({
     fontFamily: fonts.mono,
   },
 });
+
+const sectionStyles = create({
+  container: {
+    marginTop: "2rem",
+    padding: "1rem",
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: "0.75rem",
+    backgroundColor: colors.background,
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.75rem",
+  },
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  description: {
+    color: colors.secondary,
+  },
+  inputRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr auto auto",
+    gap: "0.5rem",
+    alignItems: "center",
+  },
+  input: {
+    width: "100%",
+    paddingBlock: "0.5rem",
+    paddingInline: "0.75rem",
+    borderRadius: "0.5rem",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  actionButton: {
+    cursor: "pointer",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
+    borderRadius: "0.5rem",
+    color: colors.primary,
+  },
+  actionButtonActive: {
+    backgroundColor: colors.hoverAndFocusBackground,
+  },
+  actionButtonDisabled: {
+    color: colors.secondary,
+    cursor: "not-allowed",
+  },
+  statusRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "0.5rem",
+    alignItems: "center",
+  },
+  statusBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
+    borderRadius: "999px",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    fontSize: "0.75rem",
+  },
+  statusReady: {
+    color: colors.primary,
+  },
+  statusError: {
+    color: "#b22222",
+    borderColor: "#b22222",
+  },
+  statusText: {
+    color: colors.secondary,
+  },
+});
+
+const connectionLabel: Record<ConnectionState, string> = {
+  [ConnectionState.Disconnected]: "Disconnected",
+  [ConnectionState.Connecting]: "Connecting",
+  [ConnectionState.Connected]: "Connected",
+};
+
+const OpenAiKeySection = () => {
+  const {
+    apiKey,
+    setApiKey,
+    clearApiKey,
+    connectionState,
+    status,
+    error,
+    hasApiKey,
+  } = useTranscription();
+
+  const [showKey, setShowKey] = useState(false);
+  const [inputValue, setInputValue] = useState(apiKey ?? "");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef(apiKey ?? "");
+
+  useEffect(() => {
+    lastSavedRef.current = apiKey ?? "";
+    setInputValue(apiKey ?? "");
+  }, [apiKey]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
+
+  const persistKey = useCallback(
+    (value: string, options: { force?: boolean } = {}) => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        if (options.force || lastSavedRef.current) {
+          clearApiKey();
+          lastSavedRef.current = "";
+        }
+        return;
+      }
+
+      if (!options.force && trimmed === lastSavedRef.current) return;
+      setApiKey(trimmed);
+      lastSavedRef.current = trimmed;
+    },
+    [clearApiKey, setApiKey],
+  );
+
+  const scheduleSave = useCallback(
+    (value: string) => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        persistKey(value);
+        saveTimer.current = null;
+      }, 600);
+    },
+    [persistKey],
+  );
+
+  const handleInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const next = event.target.value;
+      setInputValue(next);
+      scheduleSave(next);
+    },
+    [scheduleSave],
+  );
+
+  const handleBlur = useCallback(() => {
+    persistKey(inputValue, { force: true });
+  }, [inputValue, persistKey]);
+
+  const handleToggleShow = useCallback(() => {
+    setShowKey((prev) => !prev);
+  }, []);
+
+  const handleClear = useCallback(() => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    setInputValue("");
+    lastSavedRef.current = "";
+    clearApiKey();
+  }, [clearApiKey]);
+
+  const statusMessage = useMemo(() => {
+    if (error) return error;
+    return status;
+  }, [error, status]);
+
+  const canClear = hasApiKey || Boolean(inputValue);
+
+  return (
+    <section {...props(sectionStyles.container)} aria-labelledby="stt-heading">
+      <div {...props(sectionStyles.headerRow)}>
+        <Text id="stt-heading" tag="h2">
+          Speech to text
+        </Text>
+      </div>
+      <Text tag="p" style={sectionStyles.description}>
+        Paste your OpenAI API key to enable microphone dictation. The key is
+        stored locally and never leaves your browser.
+      </Text>
+      <div {...props(sectionStyles.inputRow)}>
+        <TextInput
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleBlur}
+          placeholder="sk-..."
+          spellCheck={false}
+          autoComplete="off"
+          type={showKey ? "text" : "password"}
+          style={sectionStyles.input}
+        />
+        <button
+          type="button"
+          onClick={handleToggleShow}
+          {...props([
+            sectionStyles.actionButton,
+            showKey && sectionStyles.actionButtonActive,
+          ])}
+          aria-pressed={showKey}
+        >
+          {showKey ? "Hide" : "Show"}
+        </button>
+        <button
+          type="button"
+          onClick={handleClear}
+          {...props([
+            sectionStyles.actionButton,
+            !canClear && sectionStyles.actionButtonDisabled,
+          ])}
+          disabled={!canClear}
+        >
+          Clear
+        </button>
+      </div>
+      <div {...props(sectionStyles.statusRow)}>
+        <span
+          {...props([
+            sectionStyles.statusBadge,
+            error ? sectionStyles.statusError : sectionStyles.statusReady,
+          ])}
+        >
+          {connectionLabel[connectionState]}
+        </span>
+        <Text tag="p" style={sectionStyles.statusText}>
+          {statusMessage}
+        </Text>
+      </div>
+    </section>
+  );
+};

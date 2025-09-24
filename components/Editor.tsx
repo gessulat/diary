@@ -10,8 +10,11 @@ import { Either } from "effect";
 import {
   $createParagraphNode,
   $getRoot,
+  $getSelection,
+  $isRangeSelection,
   COMMAND_PRIORITY_LOW,
   EditorState,
+  INSERT_TEXT_COMMAND,
   KEY_ENTER_COMMAND,
   LexicalEditor,
 } from "lexical";
@@ -31,7 +34,14 @@ import { EnsureBaseline } from "./EnsureBaseline";
 
 // TODO: Check LexicalEditorRefPlugin.
 
-export interface EditorRef extends ClearEditorPluginRef, FocusEditorPluginRef {}
+export interface InsertTextOptions {
+  appendNewLine?: boolean;
+}
+
+export interface EditorRef
+  extends ClearEditorPluginRef,
+    FocusEditorPluginRef,
+    InsertTextPluginRef {}
 
 export interface EditorProps {
   initialValue: Root;
@@ -67,6 +77,9 @@ export const Editor = memo(
         focus: () => {
           focusEditorPluginRef.current?.focus();
         },
+        insertText: (value: string, options?: InsertTextOptions) => {
+          insertTextPluginRef.current?.insertText(value, options);
+        },
       }),
       [],
     );
@@ -91,6 +104,7 @@ export const Editor = memo(
 
     const clearEditorPluginRef = useRef<ClearEditorPluginRef>(null);
     const focusEditorPluginRef = useRef<FocusEditorPluginRef>(null);
+    const insertTextPluginRef = useRef<InsertTextPluginRef>(null);
 
     const initialConfig = useMemo(
       () => ({
@@ -158,6 +172,7 @@ export const Editor = memo(
               {autoFocus && <AutoFocusPlugin />}
               {onKeyEnter && <OnKeyEnterPlugin onKeyEnter={onKeyEnter} />}
               <FocusEditorPlugin ref={focusEditorPluginRef} />
+              <InsertTextPlugin ref={insertTextPluginRef} />
             </>
           )
         }
@@ -286,3 +301,41 @@ const FocusEditorPlugin = forwardRef<FocusEditorPluginRef>(
     return null;
   },
 );
+
+interface InsertTextPluginRef {
+  insertText: (value: string, options?: InsertTextOptions) => void;
+}
+
+const InsertTextPlugin = forwardRef<InsertTextPluginRef>(function InsertTextPlugin(
+  _props,
+  ref,
+) {
+  const [editor] = useLexicalComposerContext();
+  useImperativeHandle(
+    ref,
+    () => ({
+      insertText: (value: string, options?: InsertTextOptions) => {
+        editor.update(() => {
+          const selection = $getSelection();
+          if ($isRangeSelection(selection)) {
+            if (value) {
+              selection.insertText(value);
+            }
+            if (options?.appendNewLine) {
+              selection.insertText("\n");
+            }
+          } else {
+            if (value) {
+              editor.dispatchCommand(INSERT_TEXT_COMMAND, value);
+            }
+            if (options?.appendNewLine) {
+              editor.dispatchCommand(INSERT_TEXT_COMMAND, "\n");
+            }
+          }
+        });
+      },
+    }),
+    [editor],
+  );
+  return null;
+});

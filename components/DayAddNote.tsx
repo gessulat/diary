@@ -15,6 +15,7 @@ import {
 import { NowContext } from "../lib/contexts/NowContext";
 import { useCastTemporal } from "../lib/hooks/useCastTemporal";
 import { Editor, EditorRef } from "./Editor";
+import { MicrophoneToggle } from "./MicrophoneToggle";
 
 const newNoteById = (id: NoteId) =>
   evolu.createQuery((db) =>
@@ -43,6 +44,7 @@ export const DayAddNote: FC<{
   const now = useContext(NowContext);
   const castTemporal = useCastTemporal();
   const editorRef = useRef<EditorRef>(null);
+  const transcriptRef = useRef({ inserted: "" });
 
   const addNewNote = useCallback(
     (content: ContentMax10k) => {
@@ -72,18 +74,58 @@ export const DayAddNote: FC<{
     editorRef.current?.focus();
   }, []);
 
+  const handleMicStart = useCallback(() => {
+    transcriptRef.current = { inserted: "" };
+    editorRef.current?.focus();
+  }, []);
+
+  const handleMicDelta = useCallback(
+    (delta: string) => {
+      if (!delta) return;
+      transcriptRef.current.inserted += delta;
+      editorRef.current?.insertText(delta);
+    },
+    [],
+  );
+
+  const handleMicFinal = useCallback((finalText: string) => {
+    if (!finalText) return;
+    const { inserted } = transcriptRef.current;
+    let wroteText = inserted.length > 0;
+    if (finalText.length > inserted.length) {
+      const extra = finalText.slice(inserted.length);
+      if (extra) {
+        editorRef.current?.insertText(extra);
+        transcriptRef.current.inserted += extra;
+        wroteText = true;
+      }
+    }
+    if (wroteText) {
+      editorRef.current?.insertText("", { appendNewLine: true });
+    }
+    transcriptRef.current = { inserted: "" };
+  }, []);
+
   return (
     <div {...props(styles.container)}>
       <div {...props(styles.firstColumn)} />
       <div {...props(styles.mainColumn)} onClick={handleMainColumnClick}>
-        <Editor
-          initialValue={row?.content?.root || emptyRoot}
-          isVisible={isVisible}
-          onChange={handleEditorChange}
-          onKeyEnter={handleEditorKeyEnter}
-          ref={editorRef}
-          isApp
-        />
+        <div {...props(styles.editorRow)}>
+          <Editor
+            initialValue={row?.content?.root || emptyRoot}
+            isVisible={isVisible}
+            onChange={handleEditorChange}
+            onKeyEnter={handleEditorKeyEnter}
+            ref={editorRef}
+            isApp
+          />
+          <MicrophoneToggle
+            onStart={handleMicStart}
+            onTranscriptDelta={handleMicDelta}
+            onTranscriptFinal={handleMicFinal}
+            style={styles.micButton}
+          />
+        </div>
       </div>
     </div>
   );
@@ -102,5 +144,15 @@ const styles = create({
     display: "flex",
     flex: 6,
     alignSelf: "stretch",
+    alignItems: "center",
+  },
+  editorRow: {
+    display: "flex",
+    flex: 1,
+    alignItems: "center",
+    gap: "0.75rem",
+  },
+  micButton: {
+    marginInlineStart: "0.5rem",
   },
 });
