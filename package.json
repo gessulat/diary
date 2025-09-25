@@ -16,6 +16,7 @@
   "dependencies": {
     "@effect/schema": "^0.66.14",
     "@evolu/react": "^8.0.0",
+    "@fortawesome/fontawesome-free": "^7.0.1",
     "@lexical/react": "^0.14.5",
     "@stylexjs/stylex": "^0.6.1",
     "autoprefixer": "^10.4.19",

@@ -86,30 +86,20 @@ const styles = create({
 
 const sectionStyles = create({
   container: {
-    marginTop: "2rem",
-    padding: "1rem",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: "0.75rem",
-    backgroundColor: colors.background,
     display: "flex",
     flexDirection: "column",
-    gap: "0.75rem",
-  },
-  headerRow: {
-    display: "flex",
+    gap: "1rem",
+    marginTop: "1rem",
+    marginBottom: "1rem",
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  description: {
-    color: colors.secondary,
   },
   inputRow: {
     display: "grid",
-    gridTemplateColumns: "1fr auto auto",
+    gridTemplateColumns: "auto 1fr auto auto",
     gap: "0.5rem",
     alignItems: "center",
+    width: "100%",
+    maxWidth: "400px",
   },
   input: {
     width: "100%",
@@ -131,6 +121,10 @@ const sectionStyles = create({
     paddingBlock: "0.5rem",
     borderRadius: "0.5rem",
     color: colors.primary,
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionButtonActive: {
     backgroundColor: colors.hoverAndFocusBackground,
@@ -139,42 +133,27 @@ const sectionStyles = create({
     color: colors.secondary,
     cursor: "not-allowed",
   },
-  statusRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-    alignItems: "center",
+  statusDot: {
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+    flexShrink: 0,
   },
-  statusBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    borderRadius: "999px",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    fontSize: "0.75rem",
+  statusDisconnected: {
+    backgroundColor: "#808080",
   },
-  statusReady: {
-    color: colors.primary,
+  statusConnecting: {
+    backgroundColor: "#FFA500",
   },
-  statusError: {
-    color: "#b22222",
-    borderColor: "#b22222",
+  statusConnected: {
+    backgroundColor: "#00C851",
   },
   statusText: {
-    color: colors.secondary,
+    textAlign: "center",
+    color: colors.primary,
   },
 });
 
-const connectionLabel: Record<ConnectionState, string> = {
-  [ConnectionState.Disconnected]: "Disconnected",
-  [ConnectionState.Connecting]: "Connecting",
-  [ConnectionState.Connected]: "Connected",
-};
 
 const OpenAiKeySection = () => {
   const {
@@ -182,11 +161,10 @@ const OpenAiKeySection = () => {
     setApiKey,
     clearApiKey,
     connectionState,
-    status,
-    error,
     hasApiKey,
   } = useTranscription();
 
+  const [showSection, setShowSection] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [inputValue, setInputValue] = useState(apiKey ?? "");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -259,71 +237,74 @@ const OpenAiKeySection = () => {
     clearApiKey();
   }, [clearApiKey]);
 
-  const statusMessage = useMemo(() => {
-    if (error) return error;
-    return status;
-  }, [error, status]);
+  const handleToggleSection = () => {
+    setShowSection(!showSection);
+  };
 
   const canClear = hasApiKey || Boolean(inputValue);
 
   return (
-    <section {...props(sectionStyles.container)} aria-labelledby="stt-heading">
-      <div {...props(sectionStyles.headerRow)}>
-        <Text id="stt-heading" tag="h2">
-          Speech to text
-        </Text>
-      </div>
-      <Text tag="p" style={sectionStyles.description}>
-        Paste your OpenAI API key to enable microphone dictation. The key is
-        stored locally and never leaves your browser.
-      </Text>
-      <div {...props(sectionStyles.inputRow)}>
-        <TextInput
-          value={inputValue}
-          onChange={handleInputChange}
-          onBlur={handleBlur}
-          placeholder="sk-..."
-          spellCheck={false}
-          autoComplete="off"
-          type={showKey ? "text" : "password"}
-          style={sectionStyles.input}
-        />
-        <button
-          type="button"
-          onClick={handleToggleShow}
-          {...props([
-            sectionStyles.actionButton,
-            showKey && sectionStyles.actionButtonActive,
-          ])}
-          aria-pressed={showKey}
-        >
-          {showKey ? "Hide" : "Show"}
-        </button>
-        <button
-          type="button"
-          onClick={handleClear}
-          {...props([
-            sectionStyles.actionButton,
-            !canClear && sectionStyles.actionButtonDisabled,
-          ])}
-          disabled={!canClear}
-        >
-          Clear
-        </button>
-      </div>
-      <div {...props(sectionStyles.statusRow)}>
-        <span
-          {...props([
-            sectionStyles.statusBadge,
-            error ? sectionStyles.statusError : sectionStyles.statusReady,
-          ])}
-        >
-          {connectionLabel[connectionState]}
-        </span>
-        <Text tag="p" style={sectionStyles.statusText}>
-          {statusMessage}
-        </Text>
-      </div>
-    </section>
+    <>
+      <Button
+        variant="webBig"
+        title={showSection ? "Hide Speech-to-text API key" : "Speech-to-text API key"}
+        onPress={handleToggleSection}
+      />
+      {showSection && (
+        <div {...props(sectionStyles.container)}>
+          <Text tag="p" style={sectionStyles.statusText}>
+            Enter your OpenAI API key to enable microphone dictation
+          </Text>
+          <div {...props(sectionStyles.inputRow)}>
+            <div
+              {...props([
+                sectionStyles.statusDot,
+                connectionState === ConnectionState.Disconnected && sectionStyles.statusDisconnected,
+                connectionState === ConnectionState.Connecting && sectionStyles.statusConnecting,
+                connectionState === ConnectionState.Connected && sectionStyles.statusConnected,
+              ])}
+              aria-label={
+                connectionState === ConnectionState.Connected ? "Connected" :
+                connectionState === ConnectionState.Connecting ? "Connecting" : "Disconnected"
+              }
+            />
+            <TextInput
+              value={inputValue}
+              onChange={handleInputChange}
+              onBlur={handleBlur}
+              placeholder="sk-..."
+              spellCheck={false}
+              autoComplete="off"
+              type={showKey ? "text" : "password"}
+              style={sectionStyles.input}
+            />
+            <button
+              type="button"
+              onClick={handleToggleShow}
+              {...props([
+                sectionStyles.actionButton,
+                showKey && sectionStyles.actionButtonActive,
+              ])}
+              aria-pressed={showKey}
+              aria-label={showKey ? "Hide API key" : "Show API key"}
+            >
+              <i className={showKey ? "fas fa-eye-slash" : "fas fa-eye"}></i>
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              {...props([
+                sectionStyles.actionButton,
+                !canClear && sectionStyles.actionButtonDisabled,
+              ])}
+              disabled={!canClear}
+              aria-label="Clear API key"
+            >
+              <i className="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };

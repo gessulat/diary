@@ -14,6 +14,7 @@ import { appSpacing, webSpacing } from "../lib/Themes";
 import { colors } from "../lib/Tokens.stylex";
 import { devBaseline } from "../lib/devBaseline";
 import "../styles/globals.css";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export type NextPageWithLayout<P = object, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
